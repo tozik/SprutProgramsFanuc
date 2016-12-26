@@ -1,0 +1,195 @@
+PROGRAM LPE
+	%COMMENT = 'Long prog exec'
+	%CMOSVARS
+	%ENVIRONMENT MEMO
+	%ENVIRONMENT FDEV
+	%ENVIRONMENT MULTI
+
+VAR
+	device_name	: STRING[10]	-- device name to read files from
+	file_name	: STRING[20]	-- file main name
+	file_ext		: STRING[10]	-- file extension
+	beg_num	: INTEGER	-- beginning file number
+	end_num	: INTEGER	-- ending file number
+	stat		: INTEGER	-- operation status
+	data_type	: INTEGER	-- data type value for parameter check
+	int_value	: INTEGER	-- integer parameter value
+	real_value	: REAL		-- real parameter value
+	str_value	: STRING[20]	-- string parameter value
+	num_str		: STRING[10]	-- program number in string format
+	job_done	: BOOLEAN	-- job done flag
+	cur_num		: INTEGER	-- number of currently executed program
+	next_num	: INTEGER	-- number of program to be load
+	file_str		: STRING[20]	-- string to keep full file/program names
+	
+	task_num	: INTEGER	-- task number
+	attr_val_int	: INTEGER	-- integer value of attribute
+	attr_val_str	: STRING [20]	-- string value of attribute
+	task_aborted	: BOOLEAN
+	loaded 		: BOOLEAN
+	initialized	: BOOLEAN
+
+BEGIN	
+	-- initialization
+	device_name = ''
+	file_name = ''
+	file_ext = ''
+	beg_num = 0
+	end_num = 0
+	
+	-- GETTING AND CHECKING PROGRAM PARAMETERS:
+	-- get 1st parameter - device name
+	GET_TPE_PRM(1, data_type, int_value, real_value, str_value, stat)
+	IF (stat = 0) THEN
+		IF (data_type = 3) THEN
+			device_name = str_value
+		ELSE
+			stat = 1
+			WRITE('Param 1 (device name) wrong type. String type needed', CR)
+		ENDIF		
+	ELSE		
+		WRITE('Param 1 (device name) error ', stat, CR)	
+	ENDIF
+		
+	-- get 2nd parameter - file name
+	GET_TPE_PRM(2, data_type, int_value, real_value, str_value, stat)
+	IF (stat = 0) THEN
+		IF (data_type = 3) THEN
+			file_name = str_value
+		ELSE
+			stat = 1
+			WRITE('Param 2 (file name) wrong type. String type needed', CR)
+		ENDIF		
+	ELSE		
+		WRITE('Param 2 (file name) error ', stat, CR)
+	ENDIF	
+		
+	-- get 3rd parameter - file extension
+	GET_TPE_PRM(3, data_type, int_value, real_value, str_value, stat)
+	IF (stat = 0) THEN
+		IF (data_type = 3) THEN
+			file_ext = str_value
+		ELSE
+			stat = 1
+			WRITE('Param 3 (file extension) wrong type. String type needed', CR)
+		ENDIF		
+	ELSE		
+		WRITE('Param 3 (file extension) error ', stat, CR)
+	ENDIF		
+		
+	-- get 4th parameter - beginning file number
+	GET_TPE_PRM(4, data_type, int_value, real_value, str_value, stat)
+	IF (stat = 0) THEN
+		IF (data_type = 1) THEN
+			beg_num = int_value
+		ELSE
+			stat = 1
+			WRITE('Param 4 (beg number) wrong type. Integer type needed', CR)
+		ENDIF		
+	ELSE		
+		WRITE('Param 4 (beg number) error ', stat, CR)
+	ENDIF		
+		
+	-- get 5th parameter - ending file number
+	GET_TPE_PRM(5, data_type, int_value, real_value, str_value, stat)
+	IF (stat = 0) THEN
+		IF (data_type = 1) THEN
+			end_num = int_value
+		ELSE
+			stat = 1
+			WRITE('Param 5 (end number) wrong type. Integer type needed', CR)
+		ENDIF		
+	ELSE		
+		WRITE('Param 5 (end number) error ', stat, CR)
+	ENDIF
+	
+	-- file numbers checks
+	IF (beg_num > end_num) THEN
+		stat = 1
+		WRITE('End number can not be less then beg number', CR)
+	ENDIF
+	IF (beg_num <= 0) THEN
+		stat = 1
+		WRITE('Beg number can not be less then 0', CR)
+	ENDIF
+	IF (beg_num <= 0) THEN
+		stat = 1
+		WRITE('End number can not be less then 0', CR)
+	ENDIF
+	
+
+	-- MAIN PART:
+	-- cycle variables initialization
+	job_done = FALSE
+	cur_num = beg_num
+	next_num = beg_num
+	
+	-- main cycle
+	WHILE (stat = 0) AND (job_done = FALSE) DO
+		-- load program part
+		IF (stat = 0) AND (next_num <= end_num) THEN
+			CNV_INT_STR(next_num, 0, 0, num_str)
+			num_str = SUB_STR(num_str, 2, STR_LEN(num_str))
+			file_str = device_name + ':' + file_name + num_str + '.' + file_ext
+			LOAD(file_str, 1, stat)
+			-- WRITE('Loading: ', file_str, ', ', stat, CR)		
+		ENDIF
+		
+		-- wait for program completion
+		IF (stat = 0) AND (cur_num <= end_num) AND (next_num > cur_num) THEN
+			task_aborted = FALSE
+			task_num = 0
+			CNV_INT_STR(cur_num, 0, 0, num_str)
+			num_str = SUB_STR(num_str, 2, STR_LEN(num_str))
+			-- file_str = file_name + num_str + '.' + file_ext
+			file_str = file_name + num_str
+			WHILE (task_aborted = FALSE) DO		
+				GET_TSK_INFO(file_str, task_num, TSK_STATUS, attr_val_int, attr_val_str, stat)
+				IF (attr_val_int = PG_ABORTED) THEN
+					task_aborted = TRUE
+					-- WRITE('Waiting: ', file_str, ' ended', CR)
+				ELSE
+					DELAY 50
+				ENDIF
+			ENDWHILE
+		ENDIF
+		
+		-- run program part
+		IF (stat = 0) AND (next_num <= end_num) THEN
+			CNV_INT_STR(next_num, 0, 0, num_str)
+			num_str = SUB_STR(num_str, 2, STR_LEN(num_str))
+			-- file_str = file_name + num_str + '.' + file_ext
+			file_str = file_name + num_str
+			RUN_TASK(file_str, 0, FALSE, FALSE, 1, stat)
+			-- WRITE('Running: ', file_str, ', ', stat, CR)
+		ENDIF
+		
+		-- delete program part
+		IF (stat = 0) AND (cur_num <= end_num)  AND (next_num > cur_num) THEN
+			CNV_INT_STR(cur_num, 0, 0, num_str)
+			num_str = SUB_STR(num_str, 2, STR_LEN(num_str))
+			file_str = file_name + num_str + '.' + file_ext
+			-- file_str = file_name + num_str
+			CLEAR(file_str, stat)
+			-- WRITE('Deleting: ', file_str, ', ', stat, CR)
+		ENDIF
+		
+		IF (next_num > cur_num) THEN
+			cur_num = cur_num + 1
+		ENDIF
+		
+		next_num = next_num + 1
+		
+		IF (next_num > end_num) AND (cur_num > end_num) THEN
+			job_done = TRUE
+		ENDIF			
+	ENDWHILE		
+
+	-- display program status
+	IF (stat = 0) THEN
+		WRITE('Program "', file_name, '" is succesfully done!!!', CR)
+	ELSE
+		WRITE('Program "', file_name, '" was aborted due to errors', CR)
+	ENDIF
+	
+END LPE

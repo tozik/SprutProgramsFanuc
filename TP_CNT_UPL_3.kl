@@ -1,0 +1,110 @@
+PROGRAM TP_CNT_UPL_3
+%NOLOCKGROUP
+
+VAR
+
+STATUS:INTEGER
+
+
+NAMEFULL:STRING[20]
+
+NAME:STRING[10]
+
+STAT:STRING[10]
+
+STAT_INT:INTEGER
+
+STAT_STRING:STRING[10]
+
+i:INTEGER
+
+label:INTEGER
+
+------------------------------------------------------------------------------
+n:INTEGER
+NUMBER:STRING[10]
+DUMMY_S:STRING[10]
+------------------------------------------------------------------------------
+
+BEGIN
+
+	
+	SET_SREG_CMT(1, 'PROGRAM NAME', STATUS)
+	SET_SREG_CMT(2, 'PROGRAM NUMBER', STATUS)
+	SET_SREG_CMT(3, 'STATUS', STATUS)
+	
+	GET_STR_REG (3,STAT, STATUS)
+	CNV_STR_INT (STAT, STAT_INT)
+	
+	GET_STR_REG(2,NUMBER,STATUS)
+	CNV_STR_INT(NUMBER,n)
+	
+	GET_STR_REG(1,NAME,STATUS)
+	
+	
+	label = 0
+	
+	IF(STAT_INT = 0) THEN
+		
+		STAT_INT = STAT_INT + 1
+		
+		CNV_INT_STR(STAT_INT,0,0,STAT_STRING)
+		
+		SET_STR_REG(3,STAT_STRING,STATUS)
+		
+		----------------------------------------------------------------------------------------------------------------------------------
+			n = n+1
+			
+			CNV_INT_STR (n, 0, 0, DUMMY_S)
+			DUMMY_S = SUB_STR(DUMMY_S,2,STR_LEN(DUMMY_S))
+			
+			SET_STR_REG(2, DUMMY_S,STATUS)
+		----------------------------------------------------------------------------------------------------------------------------------	
+		
+		
+		NAMEFULL = NAME + DUMMY_S
+
+		SET_STR_REG(4, NAMEFULL, STATUS)	
+		
+
+			
+-------------------------------------------------------------------------------------------------------------------------------------------
+		
+		COPY_FILE('UD1:'+NAMEFULL+'.tp', 'MD:', TRUE,FALSE, STATUS) 
+		
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+
+		
+--------------------------------------------------------------------------------------------------------
+--Can be deleted after program adjust
+
+IF (STATUS <> 0 ) THEN -- if copy was failed, post the error.	
+     POST_ERR( STATUS, '', 0, 0)
+        IF (STATUS = 2014) THEN -- FILE -014 File not found
+        	
+        	--SET_INT_REG(5, 2014, STATUS)
+        	
+          -- Force the USER menu screen
+          FORCE_SPMENU(TP_PANEL,SPI_TPUSER,1)
+          -- display the file name that is not found
+          WRITE TPDISPLAY (NAMEFULL, ' is not found',CR)
+        ENDIF
+ENDIF
+
+----------------------------------------------------------------------------------------------------------
+
+
+		
+	ELSE
+
+		
+		
+		GET_STR_REG(4,NAMEFULL,STATUS)
+		
+		
+		DELETE_FILE( 'MD:'+NAMEFULL+'.tp',FALSE,STATUS)
+		
+	ENDIF
+	
+END TP_CNT_UPL_3
